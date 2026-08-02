@@ -1,0 +1,74 @@
+=====================================================
+GUIDA RAPIDA — Come aggiornare la cassa/i telefoni
+=====================================================
+
+Indirizzi definitivi (non cambiano più):
+
+  CASSA:     https://teperino-pos.vercel.app/pos-cassa.html
+  TELEFONI:  https://teperino-pos.vercel.app/pos-teperino.html
+
+-----------------------------------------------------
+QUANDO CLAUDE TI MANDA UN FILE AGGIORNATO
+-----------------------------------------------------
+
+1. Scarica il file che ti manda Claude
+   (pos-cassa.html oppure pos-teperino.html)
+
+2. Vai su github.com e fai login
+   (account: gigi0969)
+
+3. Apri il repository:
+   github.com/gigi0969/Teperino-pos
+
+4. Clicca sul nome del file da aggiornare
+   (es. "pos-cassa.html")
+
+5. In alto a destra clicca l'icona della matita ✏️
+   (Edit this file)
+
+6. Seleziona TUTTO il contenuto che appare
+   (Cmd+A) e cancellalo (Backspace)
+
+7. Incolla dentro tutto il nuovo contenuto
+   (Cmd+V)
+
+8. Scorri in fondo alla pagina
+
+9. Clicca il pulsante verde "Commit changes..."
+   poi di nuovo "Commit changes" nella finestra
+   che si apre
+
+10. FATTO. Aspetta 20-30 secondi: Vercel pubblica
+    da solo, stesso indirizzo di sempre.
+
+-----------------------------------------------------
+IN ALTERNATIVA (più semplice per file grandi)
+-----------------------------------------------------
+
+Invece dei punti 4-9, puoi anche:
+
+1. Nella pagina del repository, clicca
+   "Add file" → "Upload files"
+
+2. Trascina dentro il nuovo pos-cassa.html
+   (o pos-teperino.html) — GitHub lo riconosce
+   come lo stesso file e lo sostituisce
+
+3. Scorri in fondo, clicca "Commit changes"
+
+-----------------------------------------------------
+VERIFICA CHE SIA ANDATO A BUON FINE
+-----------------------------------------------------
+
+Apri l'indirizzo della cassa o dei telefoni e fai
+Ctrl+F5 (ricarica forzata) per essere sicuro di
+vedere la versione nuova e non quella salvata
+nella memoria del browser.
+
+-----------------------------------------------------
+NON SERVE PIÙ
+-----------------------------------------------------
+
+- Non serve più andare su vercel.com per aggiornare
+- Non serve più creare nuovi progetti
+- L'indirizzo NON cambia mai più
