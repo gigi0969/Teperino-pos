@@ -2209,18 +2209,33 @@ function renderCategoriaOverlay(mantieniFocus){
   prodotti=[...prodotti].sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
   const cardHtml=prodotti.map(p=>{
     const inCart=Object.values(cart).filter(v=>(v.prodottoId||'')===p.id).reduce((s,v)=>s+(v.qty||0),0);
-    return '<button onclick="aggProd(\''+p.id+'\');renderCategoriaOverlay()" style="padding:14px 8px;border-radius:10px;border:none;background:'+(inCart>0?'var(--accent)':'#E8A33D')+';color:#1a1a1a;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;position:relative;box-shadow:0 2px 5px rgba(0,0,0,.25);">'+
+    const clickAzione="aggProd('"+p.id+"');renderCategoriaOverlay()";
+    return '<button onclick="'+clickAzione+'" style="padding:14px 8px;border-radius:10px;border:none;background:'+(inCart>0?'var(--accent)':'#E8A33D')+';color:#1a1a1a;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;position:relative;box-shadow:0 2px 5px rgba(0,0,0,.25);">'+
       (inCart>0?'<span style="position:absolute;top:5px;right:6px;background:#1a1a1a;color:'+'var(--accent)'+';font-size:11px;font-weight:800;padding:2px 7px;border-radius:9px;">×'+inCart+'</span>':'')+
       '<div style="font-weight:800;font-size:14px;line-height:1.25;">'+p.nome+'</div>'+
       '</button>';
   }).join('');
   const totCart=Object.entries(cart).reduce((s,[k,v])=>{const prodId=v.prodottoId||k;const p=menu.find(m=>m.id===prodId);return s+(p?(p.prezzo)*v.qty:0);},0);
   const nCart=Object.values(cart).reduce((s,v)=>s+(v.qty||0),0);
+  const riepilogoCarrello=Object.entries(cart).filter(([,v])=>v.qty>0).map(([k,v])=>{
+    const prodId=v.prodottoId||k;
+    const p=menu.find(m=>m.id===prodId);
+    if(!p)return'';
+    const aggTxt=(v.aggiunte&&v.aggiunte.length)?' <span style="color:var(--green);font-size:11px;">+'+v.aggiunte.length+'</span>':'';
+    const noteTxt=v.note?' <span style="color:var(--gold);font-size:11px;">📝</span>':'';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:8px;margin-bottom:5px;">'+
+      '<button onclick="mostraAggiunte(\''+k+'\',\''+prodId+'\')" style="background:none;border:none;color:var(--gold);font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;">✏️</button>'+
+      '<span style="flex:1;font-size:13px;font-weight:700;color:var(--text);">'+v.qty+'× '+p.nome.toUpperCase()+aggTxt+noteTxt+'</span>'+
+      '<span style="font-size:13px;color:var(--muted);flex-shrink:0;">'+eur(p.prezzo*v.qty)+'</span>'+
+      '</div>';
+  }).join('');
   ov.innerHTML=
     '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">'+
     '<button onclick="chiudiCategoriaOverlay()" style="padding:9px 16px;border-radius:8px;background:var(--accent);border:none;color:#111;font-weight:700;cursor:pointer;">⬅ Torna all\'ordine</button>'+
     '<span style="font-family:var(--font-display);font-size:19px;color:var(--accent);">'+def.icon+' '+def.label+' — T'+num+'</span>'+
+    (nCart>0?'<span style="margin-left:auto;font-family:var(--font-display);font-size:17px;color:var(--gold);">'+eur(totCart)+'</span>':'')+
     '</div>'+
+    (riepilogoCarrello?'<div style="padding:10px 14px 0;max-height:130px;overflow-y:auto;flex-shrink:0;">'+riepilogoCarrello+'</div>':'')+
     '<div style="padding:12px 14px;flex-shrink:0;">'+
     '<div style="position:relative;margin-bottom:10px;">'+
     '<input id="cat-overlay-search" type="text" value="'+(window._catSearch||'').replace(/"/g,'&quot;')+'" placeholder="🔍 Cerca per nome..." '+
@@ -2256,20 +2271,27 @@ function chCop(d){
 }
 
 function aggProd(id){
-  const p=menu.find(m=>m.id===id);if(!p) return;
+  const p=menu.find(m=>m.id===id);if(!p) return null;
+  let cartKey;
   if(p.reparto==='Bar'){
     const c=cart[id]||{qty:0,aggiunte:[],prodottoId:id};
     c.qty++;cart[id]=c;
+    cartKey=id;
   } else {
     const k=id+'_'+Date.now();
     cart[k]={qty:1,aggiunte:[],note:'',prodottoId:id};
+    cartKey=k;
   }
   window.buildOrdinazione();
+  return cartKey;
 }
 
 function mostraAggiunte(cartKey,prodId){
   const p=menu.find(m=>m.id===prodId);if(!p) return;
-  const ov=document.getElementById('login-overlay');
+  const pizzaOv=document.getElementById('pizza-overlay');
+  const dentroFullscreen=pizzaOv&&pizzaOv.style.display==='flex';
+  const ov=dentroFullscreen?pizzaOv:document.getElementById('login-overlay');
+  const tornaIndietro=()=>{ if(dentroFullscreen&&typeof renderCategoriaOverlay==='function') renderCategoriaOverlay(); else window.buildOrdinazione(); };
   const aggs=settings.aggiunte||[];
   function aggHtml(){
     const c=cart[cartKey];
@@ -2282,7 +2304,7 @@ function mostraAggiunte(cartKey,prodId){
     const aggs=settings.aggiunte||[];
     const isPizza=p.reparto==='Pizzeria';
     ov.innerHTML=
-      '<div style="width:100%;max-width:520px;">'+
+      '<div style="width:100%;max-width:520px;'+(dentroFullscreen?'margin:auto;padding:20px;':'')+'">'+
       '<div style="font-family:var(--font-display);font-size:22px;color:var(--accent);margin-bottom:4px;">'+p.nome+'</div>'+
       '<div style="font-size:13px;color:var(--muted);margin-bottom:14px;">'+eur(p.prezzo)+' base</div>'+
       (isPizza&&aggs.length?
@@ -2292,8 +2314,8 @@ function mostraAggiunte(cartKey,prodId){
       '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Nota</div>'+
       '<input id="agg-note" placeholder="es. senza cipolla, ben cotto..." value="'+(cart[cartKey].note||'')+'" oninput="cart[\''+cartKey+'\'].note=this.value" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:14px;box-sizing:border-box;">'+
       '<div style="display:flex;gap:8px;">'+
-      '<button onclick="delete cart[\''+cartKey+'\'];window.buildOrdinazione()" style="flex:1;padding:14px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:14px;cursor:pointer;">Annulla</button>'+
-      '<button onclick="window.buildOrdinazione()" style="flex:2;padding:14px;border-radius:10px;background:var(--accent);border:none;color:#111;font-size:16px;font-weight:700;cursor:pointer;">✓ Conferma</button>'+
+      '<button onclick="delete cart[\''+cartKey+'\'];tornaDopoAggiunte()" style="flex:1;padding:14px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:14px;cursor:pointer;">Annulla</button>'+
+      '<button onclick="tornaDopoAggiunte()" style="flex:2;padding:14px;border-radius:10px;background:var(--accent);border:none;color:#111;font-size:16px;font-weight:700;cursor:pointer;">✓ Conferma'+(dentroFullscreen?' — continua a scegliere':'')+'</button>'+
       '</div></div>';
   }
   window.togAgg=function(ck,aid){
@@ -2303,6 +2325,7 @@ function mostraAggiunte(cartKey,prodId){
     if(i===-1) c.aggiunte.push(aid); else c.aggiunte.splice(i,1);
     document.getElementById('agg-chips').innerHTML=aggHtml();
   };
+  window.tornaDopoAggiunte=tornaIndietro;
   render();
 }
 
@@ -2511,6 +2534,20 @@ const firebaseConfig = {
         settings.camerieri=Array.isArray(val)?val:Object.values(val);
         localStorage.setItem('pos-camerieri',JSON.stringify(settings.camerieri));
       }
+    });
+
+    // Riceve il menu quando viene modificato dalla cassa (o da un altro telefono)
+    let _menuInit=false;
+    onValue(ref(db,'pos/menu'),(snap)=>{
+      if(!snap.exists())return;
+      if(!_menuInit){ _menuInit=true; return; } // ignora il primo evento (è il nostro stesso menu iniziale)
+      const nuovoMenu=snap.val();
+      if(!Array.isArray(nuovoMenu)||!nuovoMenu.length)return;
+      menu=nuovoMenu;
+      localStorage.setItem('pos-menu',JSON.stringify(menu));
+      // aggiorna la vista prodotti se è aperta in questo momento
+      if(typeof renderCategoriaOverlay==='function' && document.getElementById('pizza-overlay')?.style.display==='flex') renderCategoriaOverlay();
+      if(typeof window.buildOrdinazione==='function') window.buildOrdinazione();
     });
 
     // Ascolta i tavoli da Firebase
