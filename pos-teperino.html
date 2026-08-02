@@ -2206,6 +2206,7 @@ function renderCategoriaOverlay(mantieniFocus){
       '<div style="font-weight:800;font-size:12px;line-height:1.2;">'+label+'</div>'+
       '</button>';
   }).join('');
+  prodotti=[...prodotti].sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
   const cardHtml=prodotti.map(p=>{
     const inCart=Object.values(cart).filter(v=>(v.prodottoId||'')===p.id).reduce((s,v)=>s+(v.qty||0),0);
     return '<button onclick="aggProd(\''+p.id+'\');renderCategoriaOverlay()" style="padding:14px 8px;border-radius:10px;border:none;background:'+(inCart>0?'var(--accent)':'#E8A33D')+';color:#1a1a1a;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;position:relative;box-shadow:0 2px 5px rgba(0,0,0,.25);">'+
