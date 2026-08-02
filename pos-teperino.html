@@ -2153,7 +2153,7 @@ function entraTavolo(key){
 
 // ── PANNELLO CATEGORIA A SCHERMO INTERO (Bar / Cucina / Pizza) ──
 const CATEGORIA_DEF={
-  pizza:{icon:'🍕',label:'PIZZA',reparto:'Pizzeria',cats:[['🍕 Pizze','Classiche'],['👑 Reali','Reali'],['📜 Storiche','Storiche'],['👵 Suocere','Tre Suocere'],['⭐ Speciali','Speciali'],['🥟 Fritte','Fritte'],['🥖 Panuozzi','Panuozzi']]},
+  pizza:{icon:'🍕',label:'PIZZA',reparto:'Pizzeria',cats:[['📋 Tutte','Tutte'],['🍕 Pizze','Classiche'],['👑 Reali','Reali'],['📜 Storiche','Storiche'],['👵 Suocere','Tre Suocere'],['⭐ Speciali','Speciali'],['🥟 Fritte','Fritte'],['🥖 Panuozzi','Panuozzi']]},
   bar:{icon:'🍹',label:'BAR',reparto:'Bar',cats:[['🍺 Birre','Birre'],['🥤 Bibite','Bibite'],['🍷 Vino','Vino'],['☕ Caffetteria','Caffetteria'],['🥃 Liquori','Liquori'],['🍹 Aperitivo','Aperitivo']]},
   cucina:{icon:'🍟',label:'CUCINA',reparto:'Cucina',cats:[['🍟 Antipasti','Antipasti'],['🍰 Dolci','Dolci']]}
 };
@@ -2193,6 +2193,8 @@ function renderCategoriaOverlay(mantieniFocus){
     const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     const q=norm(searchTxt);
     prodotti=menu.filter(m=>m.reparto===def.reparto&&norm(m.nome).includes(q));
+  } else if(window._catOverlayCat.endsWith(' Tutte')){
+    prodotti=menu.filter(m=>m.reparto===def.reparto);
   } else {
     prodotti=getItemsForTab(window._catOverlayCat);
   }
