@@ -2120,7 +2120,7 @@ function entraTavolo(key){
       '</div>';
     const totCart=Object.entries(cart).reduce((s,[k,v])=>{const prodId=v.prodottoId||k;const p=menu.find(m=>m.id===prodId);return s+(p?(p.prezzo)*v.qty:0);},0);
     ov.innerHTML=
-      '<div style="width:100%;max-width:520px;height:100%;display:flex;flex-direction:column;overflow-y:auto;">'+
+      '<div style="width:100%;max-width:520px;height:100%;display:flex;flex-direction:column;overflow:hidden;">'+
       '<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:8px;flex-shrink:0;">'+
       '<button onclick="mostraSala(\''+activeZona+'\')" style="padding:7px 12px;border-radius:8px;background:var(--accent);border:none;color:#111;font-weight:700;cursor:pointer;margin-right:10px;">⬅ Sala</button>'+
       '<span style="font-family:var(--font-display);font-size:18px;color:var(--accent);">T'+num+' — '+zonaLabel+'</span>'+
@@ -2138,10 +2138,10 @@ function entraTavolo(key){
       '<button onclick="chCop(1)" style="width:30px;height:30px;border-radius:6px;background:var(--accent);border:none;color:#111;font-size:18px;cursor:pointer;font-weight:700;">+</button>'+
       '</div>'+
       // prodotti
-      // messaggio guida al posto della vecchia griglia (ora si sceglie dal pannello a schermo intero)
-      '<div style="display:flex;align-items:center;justify-content:center;flex:1;color:var(--muted);font-size:13px;text-align:center;padding:20px;">Tocca Bar, Cucina o Pizza qui sopra<br>per scegliere i prodotti</div>'+
-      // carrello
-      (cartVoci?'<div style="background:var(--surface2);border-radius:8px;padding:8px;margin-bottom:8px;flex-shrink:0;max-height:120px;overflow-y:auto;">'+cartVoci+'</div>':'')+
+      // messaggio guida compatto (solo se non c'è ancora nulla in carrello o già ordinato)
+      (!cartVoci&&!riepilogoHtml?'<div style="text-align:center;color:var(--muted);font-size:12px;padding:14px 10px;flex-shrink:0;">Tocca Bar, Cucina o Pizza qui sopra per scegliere i prodotti</div>':'')+
+      // carrello — ora prende tutto lo spazio disponibile e scorre se serve
+      '<div style="flex:1;overflow-y:auto;min-height:0;'+(cartVoci?'background:var(--surface2);border-radius:8px;padding:8px;margin-bottom:8px;':'')+'">'+cartVoci+'</div>'+
       // bottone invia
       (totCart>0?'<button onclick="inviaOrdine(\''+key+'\')" style="width:100%;padding:14px;border-radius:12px;background:var(--accent);border:none;color:#111;font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0;">📨 Invia comanda — '+eur(totCart)+'</button>':
       '<button style="width:100%;padding:14px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:14px;cursor:default;flex-shrink:0;">Seleziona prodotti</button>')+
