@@ -623,7 +623,7 @@ function variantiSelezionate(v){
   }).filter(Boolean);
 }
 function variantiExtra(v){ return variantiSelezionate(v).reduce((s,a)=>s+a.prezzo,0); }
-function variantiLabel(v){ return variantiSelezionate(v).map(a=>(a.tipo==='tolto'?'−':'+')+a.nome).join(', '); }
+function variantiLabel(v){ return variantiSelezionate(v).map(a=>a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome).join(', '); }
 function nowTime() { return new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}); }
 function todayStr() { return new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}); }
 
@@ -1660,7 +1660,7 @@ function stampaAsporto(id) {
     ${o.cliente?`<div class="p-center">${o.cliente}${o.telefono?' — '+o.telefono:''}</div>`:''}
     <div class="p-small p-center">${o.data} ore ${o.creatoAlle}</div>
     <div class="p-divider"></div>
-    ${o.voci.map(v=>`<div class="p-row"><span>${v.qty}× ${v.nome}${(v.aggiunte||[]).length?' (+'+v.aggiunte.map(a=>a.nome).join(', ')+')':''}${v.note?' ('+v.note+')':''}</span><span>${((v.prezzoUnitario||v.prezzo)*v.qty).toFixed(2)}</span></div>`).join('')}
+    ${o.voci.map(v=>`<div class="p-row"><span>${v.qty}× ${v.nome}${(v.aggiunte||[]).length?' ('+v.aggiunte.map(a=>a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome).join(', ')+')':''}${v.note?' ('+v.note+')':''}</span><span>${((v.prezzoUnitario||v.prezzo)*v.qty).toFixed(2)}</span></div>`).join('')}
     <div class="p-divider"></div>
     <div class="p-row p-big"><span>TOTALE</span><span>${tot.toFixed(2)} €</span></div>
     <div class="p-center p-small" style="margin-top:8px;">Grazie!</div>`;
@@ -2103,7 +2103,7 @@ function entraTavolo(key){
       '<div style="background:var(--surface);border-radius:8px;padding:8px;margin-bottom:8px;flex-shrink:0;">'+
       '<div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Già ordinato</div>'+
       vociPrecedenti.map(v=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:var(--muted);">'+
-        '<span>'+v.qty+'× '+v.nome+(v.aggiunte&&v.aggiunte.length?' (+'+v.aggiunte.map(a=>a.nome).join(', ')+')':'')+'</span>'+
+        '<span>'+v.qty+'× '+v.nome+(v.aggiunte&&v.aggiunte.length?' ('+v.aggiunte.map(a=>a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome).join(', ')+')':'')+'</span>'+
         '<span>'+eur((v.prezzoUnitario||v.prezzo)*v.qty)+'</span></div>').join('')+
       '</div>':'';
     const voci=(t.giri||[]).flatMap(g=>g.voci||[]);
@@ -2115,7 +2115,7 @@ function entraTavolo(key){
       const aggNomi=variantiLabel(v);
       const aggE=variantiExtra(v);
       return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">'+
-        '<span style="flex:1">'+v.qty+'× '+p.nome+(aggNomi?' <span style=\'color:var(--green);font-size:11px\'>(+'+aggNomi+')</span>':'')+(v.note?' <span style=\'color:var(--muted);font-size:11px\'>'+v.note+'</span>':'')+'</span>'+
+        '<span style="flex:1">'+v.qty+'× '+p.nome+(aggNomi?' <span style=\'color:var(--green);font-size:11px\'>('+aggNomi+')</span>':'')+(v.note?' <span style=\'color:var(--muted);font-size:11px\'>'+v.note+'</span>':'')+'</span>'+
         '<span style="color:var(--muted);flex-shrink:0;">'+eur((p.prezzo+aggE)*v.qty)+'</span>'+
         (p.reparto!=='Bar'?'<button onclick="mostraAggiunte(\''+k+'\',\''+prodId+'\')" style="background:none;border:none;color:var(--gold);font-size:16px;cursor:pointer;padding:2px 4px;">'+(p.reparto==='Pizzeria'?'✏️':'📝')+'</button>':'')+
         '<button onclick="delete cart[\''+k+'\'];window.buildOrdinazione()" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:2px 4px;font-weight:700;">✕</button>'+
@@ -2211,19 +2211,22 @@ function renderCategoriaOverlay(mantieniFocus){
   const catBtns=def.cats.map(([tab,label])=>{
     const attivo=!searchTxt&&window._catOverlayCat===tab;
     const icon=tab.split(' ')[0];
-    return '<button onclick="setCategoriaOverlayCat(\''+tab+'\')" style="padding:12px 6px;border-radius:10px;border:none;background:'+(attivo?'var(--accent)':'#3a3a3a')+';color:'+(attivo?'#111':'var(--text)')+';cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:64px;box-shadow:0 2px 5px rgba(0,0,0,.25);">'+
-      '<div style="font-size:24px;line-height:1;">'+icon+'</div>'+
-      '<div style="font-weight:800;font-size:12px;line-height:1.2;">'+label+'</div>'+
+    return '<button onclick="setCategoriaOverlayCat(\''+tab+'\')" style="padding:6px 4px;border-radius:8px;border:none;background:'+(attivo?'var(--accent)':'#3a3a3a')+';color:'+(attivo?'#111':'var(--text)')+';cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:42px;box-shadow:0 2px 5px rgba(0,0,0,.25);">'+
+      '<div style="font-size:15px;line-height:1;">'+icon+'</div>'+
+      '<div style="font-weight:800;font-size:9px;line-height:1.1;">'+label+'</div>'+
       '</button>';
   }).join('');
   prodotti=[...prodotti].sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
   const cardHtml=prodotti.map(p=>{
     const inCart=Object.values(cart).filter(v=>(v.prodottoId||'')===p.id).reduce((s,v)=>s+(v.qty||0),0);
     const clickAzione="aggProd('"+p.id+"');renderCategoriaOverlay()";
-    return '<button onclick="'+clickAzione+'" style="padding:14px 8px;border-radius:10px;border:none;background:'+(inCart>0?'var(--accent)':'#E8A33D')+';color:#1a1a1a;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;position:relative;box-shadow:0 2px 5px rgba(0,0,0,.25);">'+
-      (inCart>0?'<span style="position:absolute;top:5px;right:6px;background:#1a1a1a;color:'+'var(--accent)'+';font-size:11px;font-weight:800;padding:2px 7px;border-radius:9px;">×'+inCart+'</span>':'')+
-      '<div style="font-weight:800;font-size:14px;line-height:1.25;">'+p.nome+'</div>'+
-      '</button>';
+    return '<div style="position:relative;">'+
+      '<button onclick="'+clickAzione+'" style="width:100%;padding:9px 6px;border-radius:9px;border:none;background:'+(inCart>0?'var(--accent)':'#E8A33D')+';color:#1a1a1a;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;min-height:50px;box-shadow:0 2px 5px rgba(0,0,0,.25);">'+
+      '<div style="font-weight:800;font-size:12px;line-height:1.2;">'+p.nome+'</div>'+
+      '</button>'+
+      (inCart>0?'<span style="position:absolute;top:-6px;right:-6px;background:#1a1a1a;color:var(--accent);font-size:10px;font-weight:800;padding:2px 6px;border-radius:9px;pointer-events:none;">×'+inCart+'</span>':'')+
+      (inCart>0?'<button onclick="rimuoviUltimo(\''+p.id+'\');event.stopPropagation();" title="Togli l\'ultimo aggiunto" style="position:absolute;bottom:-6px;left:-6px;width:22px;height:22px;border-radius:50%;background:#C0392B;color:#fff;border:2px solid #1a1a1a;font-size:12px;font-weight:800;cursor:pointer;line-height:1;padding:0;">✕</button>':'')+
+      '</div>';
   }).join('');
   const totCart=Object.entries(cart).reduce((s,[k,v])=>{const prodId=v.prodottoId||k;const p=menu.find(m=>m.id===prodId);if(!p)return s;const aggE=variantiExtra(v);return s+(p.prezzo+aggE)*v.qty;},0);
   const nCart=Object.values(cart).reduce((s,v)=>s+(v.qty||0),0);
@@ -2232,12 +2235,13 @@ function renderCategoriaOverlay(mantieniFocus){
     const p=menu.find(m=>m.id===prodId);
     if(!p)return'';
     const aggE=variantiExtra(v);
-    const _vsel=variantiSelezionate(v);const aggTxt=_vsel.length?' <span style="color:var(--green);font-size:11px;">'+_vsel.length+'</span>':'';
+    const aggTxt=variantiLabel(v)?' <span style="color:var(--green);font-size:11px;font-weight:600;">('+variantiLabel(v)+')</span>':'';
     const noteTxt=v.note?' <span style="color:var(--gold);font-size:11px;">📝</span>':'';
     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:8px;margin-bottom:5px;">'+
       '<button onclick="mostraAggiunte(\''+k+'\',\''+prodId+'\')" style="background:none;border:none;color:var(--gold);font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;">✏️</button>'+
       '<span style="flex:1;font-size:13px;font-weight:700;color:var(--text);">'+v.qty+'× '+p.nome.toUpperCase()+aggTxt+noteTxt+'</span>'+
       '<span style="font-size:13px;color:var(--muted);flex-shrink:0;">'+eur((p.prezzo+aggE)*v.qty)+'</span>'+
+      '<button onclick="rimuoviRigaCarrello(\''+k+'\')" style="background:none;border:none;color:var(--red);font-size:15px;font-weight:800;cursor:pointer;padding:2px 6px;flex-shrink:0;">✕</button>'+
       '</div>';
   }).join('');
   ov.innerHTML=
@@ -2254,14 +2258,15 @@ function renderCategoriaOverlay(mantieniFocus){
     'style="width:100%;padding:14px 16px;border-radius:10px;border:2px solid var(--accent);background:var(--surface2);color:var(--text);font-size:15px;box-sizing:border-box;">'+
     (window._catSearch?'<button onclick="categoriaOverlaySearch(\'\')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>':'')+
     '</div>'+
-    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:7px;'+(searchTxt?'opacity:.4;pointer-events:none;':'')+'">'+catBtns+'</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:5px;'+(searchTxt?'opacity:.4;pointer-events:none;':'')+'">'+catBtns+'</div>'+
     '</div>'+
     '<div style="flex:1;overflow-y:auto;padding:0 14px 14px;">'+
-    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:8px;">'+cardHtml+'</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(85px,1fr));gap:6px;">'+cardHtml+'</div>'+
     (prodotti.length===0?'<div style="text-align:center;color:var(--muted);padding:30px;">Nessun risultato</div>':'')+
     '</div>'+
-    (nCart>0?'<div style="padding:12px 14px;border-top:1px solid var(--border);flex-shrink:0;">'+
-      '<button onclick="chiudiCategoriaOverlay()" style="width:100%;padding:15px;border-radius:12px;background:var(--accent);border:none;color:#111;font-size:16px;font-weight:700;cursor:pointer;">✔ Fatto — '+nCart+' articoli nel carrello ('+eur(totCart)+') — Torna all\'ordine</button>'+
+    (nCart>0?'<div style="padding:12px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:8px;">'+
+      '<button onclick="inviaOrdineDaOverlay(\''+key+'\')" style="width:100%;padding:15px;border-radius:12px;background:var(--accent);border:none;color:#111;font-size:16px;font-weight:700;cursor:pointer;">📨 Invia comanda — '+eur(totCart)+'</button>'+
+      '<button onclick="chiudiCategoriaOverlay()" style="width:100%;padding:10px;border-radius:10px;background:none;border:1px solid var(--border);color:var(--muted);font-size:13px;cursor:pointer;">⬅ Torna all\'ordine (continua a scegliere altrove)</button>'+
       '</div>':'');
   if(mantieniFocus){
     const si=document.getElementById('cat-overlay-search');
@@ -2296,6 +2301,31 @@ function aggProd(id){
   window.buildOrdinazione();
   return cartKey;
 }
+function rimuoviRigaCarrello(k){
+  delete cart[k];
+  window.buildOrdinazione();
+  const pov=document.getElementById('pizza-overlay');
+  if(pov&&pov.style.display==='flex'&&typeof renderCategoriaOverlay==='function') renderCategoriaOverlay();
+}
+function rimuoviUltimo(prodId){
+  const p=menu.find(m=>m.id===prodId); if(!p) return;
+  if(p.reparto==='Bar'){
+    const c=cart[prodId]; if(!c) return;
+    c.qty--;
+    if(c.qty<=0) delete cart[prodId];
+  } else {
+    // tolgo l'ultima riga aggiunta per questo prodotto (la più recente)
+    const keys=Object.keys(cart).filter(k=>cart[k].prodottoId===prodId);
+    if(!keys.length) return;
+    keys.sort((a,b)=>(parseInt(b.split('_').pop())||0)-(parseInt(a.split('_').pop())||0));
+    delete cart[keys[0]];
+  }
+  window.buildOrdinazione();
+  if(typeof renderCategoriaOverlay==='function'){
+    const pov=document.getElementById('pizza-overlay');
+    if(pov&&pov.style.display==='flex') renderCategoriaOverlay();
+  }
+}
 
 function mostraAggiunte(cartKey,prodId){
   const p=menu.find(m=>m.id===prodId);if(!p) return;
@@ -2311,7 +2341,7 @@ function mostraAggiunte(cartKey,prodId){
       const stato=c.varianti[a.id]; // undefined | 'add' | 'remove'
       const bg = stato==='add' ? 'var(--accent)' : stato==='remove' ? '#C0392B' : '#4a4a4a';
       const colore = stato ? '#fff' : '#ccc';
-      const segno = stato==='add' ? '+ ' : stato==='remove' ? '− ' : '';
+      const segno = stato==='add' ? '+ ' : stato==='remove' ? 'SENZA ' : '';
       return '<button onclick="cicloVariante(\''+cartKey+'\',\''+a.id+'\')" style="padding:14px 8px;border-radius:10px;border:none;background:'+bg+';color:'+colore+';cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;min-height:64px;box-shadow:0 2px 5px rgba(0,0,0,.25);">'+
         '<div style="font-weight:800;font-size:13px;line-height:1.25;">'+segno+a.nome+'</div>'+
         '</button>';
@@ -2347,6 +2377,13 @@ function mostraAggiunte(cartKey,prodId){
   render();
 }
 
+function inviaOrdineDaOverlay(key){
+  // chiudo il pannello pizza prima di inviare, cosi' se serve una conferma
+  // (es. "ordine misto pizza+antipasto") resta visibile e non nascosta dietro
+  document.getElementById('pizza-overlay').style.display='none';
+  if(window.buildOrdinazione) window.buildOrdinazione();
+  inviaOrdine(key);
+}
 function inviaOrdine(key, aspettaAntipasto){
   const ci=Object.entries(cart).filter(([,v])=>v.qty>0);
   if(!ci.length) return;
