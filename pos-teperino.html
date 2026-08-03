@@ -430,11 +430,11 @@ const DEFAULT_MENU = [
   {id:'s02',nome:'Parmigiana',prezzo:14,reparto:'Pizzeria',cat:'Reali'},
 
   // ── Speciali rimaste (non presenti nel nuovo menu fotografato, mantenute) ──
-  {id:'s01',nome:'Crocché',prezzo:11,reparto:'Pizzeria',cat:'Speciali'},
-  {id:'s03',nome:'Valtellina',prezzo:12,reparto:'Pizzeria',cat:'Speciali'},
-  {id:'s05',nome:'Piennolo',prezzo:13,reparto:'Pizzeria',cat:'Speciali'},
-  {id:'s08',nome:'Cacio e Pepe',prezzo:11,reparto:'Pizzeria',cat:'Speciali'},
-  {id:'s14',nome:'Doc',prezzo:13,reparto:'Pizzeria',cat:'Speciali'},
+  {id:'s01',nome:'Crocché',prezzo:11,reparto:'Pizzeria'},
+  {id:'s03',nome:'Valtellina',prezzo:12,reparto:'Pizzeria'},
+  {id:'s05',nome:'Piennolo',prezzo:13,reparto:'Pizzeria'},
+  {id:'s08',nome:'Cacio e Pepe',prezzo:11,reparto:'Pizzeria'},
+  {id:'s14',nome:'Doc',prezzo:13,reparto:'Pizzeria'},
 
   // ── LE PIZZE STORICHE (nuova categoria) ──
   {id:'p14',nome:'Sorrentina',prezzo:13,reparto:'Pizzeria',cat:'Storiche'},
@@ -531,7 +531,7 @@ const DEFAULT_MENU = [
 // ─────────────────────────────────────────────
 let settings = LS.get('pos-settings', DEFAULT_SETTINGS);
 if(!settings.zone||!settings.zone.length) settings.zone = DEFAULT_SETTINGS.zone;
-const MENU_VERSION=4; // v4 = nuovo menu (Pizze Reali, Storiche, Tre Suocere, tagliere/aperitivo/drink aggiornati)
+const MENU_VERSION=5; // v5 = tolta la categoria Speciali, pizze rimaste unite a Classiche
 if(LS.get('pos-mv',0)<MENU_VERSION){LS.set('pos-menu',DEFAULT_MENU);LS.set('pos-mv',MENU_VERSION);}
 let menu     = LS.get('pos-menu', DEFAULT_MENU);
 let tavoli   = {}; // parte sempre vuoto, Firebase aggiorna al caricamento
@@ -578,7 +578,6 @@ menu.forEach(p => {
   if(dolciIds.includes(p.id) && !p.cat)    { p.cat = 'Dolci';    migrated = true; }
   if(panuozziIds.includes(p.id) && p.reparto !== 'Pizzeria') { p.reparto = 'Pizzeria'; migrated = true; }
   if(panuozziIds.includes(p.id) && !p.cat) { p.cat = 'Panuozzi'; migrated = true; }
-  if(specialiIds.includes(p.id) && !p.cat) { p.cat = 'Speciali';  migrated = true; }
   if(fritteIds.includes(p.id)   && !p.cat) { p.cat = 'Fritte';    migrated = true; }
   if(vinoIds.includes(p.id)     && !p.cat) { p.cat = 'Vino';      migrated = true; }
 });
@@ -614,6 +613,17 @@ function saveAll() { LS.set('pos-settings', settings); LS.set('pos-menu', menu);
 // ─────────────────────────────────────────────
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 function eur(n) { return Number(n).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'; }
+// Converte la mappa varianti {id:'add'|'remove'} dell'articolo nel carrello in un elenco utilizzabile
+function variantiSelezionate(v){
+  const mappa=v.varianti||{};
+  return Object.entries(mappa).map(([aid,stato])=>{
+    const a=(settings.aggiunte||[]).find(x=>x.id===aid);
+    if(!a) return null;
+    return {id:a.id,nome:a.nome,prezzo:stato==='add'?a.prezzo:0,tipo:stato==='add'?'aggiunta':'tolto'};
+  }).filter(Boolean);
+}
+function variantiExtra(v){ return variantiSelezionate(v).reduce((s,a)=>s+a.prezzo,0); }
+function variantiLabel(v){ return variantiSelezionate(v).map(a=>(a.tipo==='tolto'?'−':'+')+a.nome).join(', '); }
 function nowTime() { return new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}); }
 function todayStr() { return new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'}); }
 
@@ -724,8 +734,7 @@ function getItemsForTab(tab) {
   if(tab === '👑 Reali')    return menu.filter(m => m.cat==='Reali');
   if(tab === '📜 Storiche') return menu.filter(m => m.cat==='Storiche');
   if(tab === '👵 Suocere')  return menu.filter(m => m.cat==='Suocere');
-  if(tab === '⭐ Speciali') return menu.filter(m => m.cat==='Speciali');
-  if(tab === '🥟 Fritte')   return menu.filter(m => m.cat==='Fritte');
+    if(tab === '🥟 Fritte')   return menu.filter(m => m.cat==='Fritte');
   if(tab === '🥖 Panuozzi') return menu.filter(m => m.cat==='Panuozzi');
   if(tab === '🍰 Dolci')    return menu.filter(m => m.cat==='Dolci');
   if(tab === '🍷 Vino')     return menu.filter(m => m.cat==='Vino');
@@ -742,7 +751,7 @@ function getItemsForTab(tab) {
 function renderMenuTabs() {
   const bar = document.getElementById('menu-tab-bar');
   if (!bar) return;
-  const tabs = ['Riepilogo', '🍺 Bar', '🍷 Vino', '🍕 Pizze', '👑 Reali', '📜 Storiche', '👵 Suocere', '⭐ Speciali', '🥟 Fritte', '🥖 Panuozzi', '🍟 Antipasti', '🍰 Dolci'];
+  const tabs = ['Riepilogo', '🍺 Bar', '🍷 Vino', '🍕 Pizze', '👑 Reali', '📜 Storiche', '👵 Suocere', '🥟 Fritte', '🥖 Panuozzi', '🍟 Antipasti', '🍰 Dolci'];
   bar.innerHTML = tabs.map(t => `
     <button onclick="setMenuTab('${t}')" style="
       white-space:nowrap; padding:6px 14px; border-radius:8px; font-size:12px;
@@ -1427,7 +1436,7 @@ function openAsportoOrdine(id) {
 function renderAsportoMenuTabs() {
   const bar = document.getElementById('asporto-menu-tab-bar');
   if (!bar) return;
-  const tabs = ['Riepilogo', '🍺 Bar', '🍷 Vino', '🍕 Pizze', '👑 Reali', '📜 Storiche', '👵 Suocere', '⭐ Speciali', '🥟 Fritte', '🥖 Panuozzi', '🍟 Antipasti', '🍰 Dolci'];
+  const tabs = ['Riepilogo', '🍺 Bar', '🍷 Vino', '🍕 Pizze', '👑 Reali', '📜 Storiche', '👵 Suocere', '🥟 Fritte', '🥖 Panuozzi', '🍟 Antipasti', '🍰 Dolci'];
   bar.innerHTML = tabs.map(t => `
     <button onclick="setAsportoTab('${t}')" style="
       white-space:nowrap;padding:6px 14px;border-radius:8px;font-size:12px;
@@ -1799,7 +1808,8 @@ function renderImpostazioni() {
       <button class="btn btn-primary" style="margin-top:12px;" onclick="saveReparti()">💾 Salva reparti</button>
     `;
   } else if (currentImpTab === 'aggiunte') {
-    let html = `<div class="card-label" style="padding:0 0 8px;">Aggiunte disponibili (solo per pizze)</div>`;
+    let html = `<div class="card-label" style="padding:0 0 8px;">Ingredienti variabili (solo per pizze)</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Ogni ingrediente qui sotto potrà essere aggiunto (a pagamento) o tolto (gratis) direttamente al momento dell'ordine, senza doverlo impostare qui.</div>`;
     (settings.aggiunte||[]).forEach((a,i) => {
       html += `<div id="agg-row-${i}" class="menu-item-row" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:6px 8px;margin-bottom:5px;display:flex;gap:6px;align-items:center;">
         <input id="an-${i}" class="form-input" style="flex:2;font-size:12px;padding:5px 8px" value="${a.nome.replace(/"/g,'&quot;')}">
@@ -1810,8 +1820,8 @@ function renderImpostazioni() {
     });
     html += `<div class="card-label" style="margin-top:14px;padding:0 0 6px;">Aggiungi ingrediente</div>
       <div class="menu-item-row">
-        <input class="form-input" id="new-agg-nome" placeholder="Es. Speck">
-        <input class="form-input price" type="number" step="0.5" id="new-agg-prezzo" placeholder="€">
+        <input class="form-input" id="new-agg-nome" placeholder="Es. Speck, Olive, Funghi...">
+        <input class="form-input price" type="number" step="0.5" id="new-agg-prezzo" placeholder="€ (prezzo se viene aggiunto)">
         <button class="icon-btn" style="background:var(--accent);color:#111;border:none;" onclick="addAgg()">+</button>
       </div>
       <div id="agg-msg" style="margin-top:8px;"></div>`;
@@ -1823,7 +1833,6 @@ function renderImpostazioni() {
       {id:'reali',    nome:'👑 Reali',    fn: m=>m.cat==='Reali'},
       {id:'storiche', nome:'📜 Storiche', fn: m=>m.cat==='Storiche'},
       {id:'suocere',  nome:'👵 Suocere',  fn: m=>m.cat==='Suocere'},
-      {id:'speciali', nome:'⭐ Speciali', fn: m=>m.cat==='Speciali'},
       {id:'fritte',   nome:'🥟 Fritte',   fn: m=>m.cat==='Fritte'},
       {id:'panuozzi', nome:'🥖 Panuozzi', fn: m=>m.cat==='Panuozzi'},
       {id:'cucina',   nome:'🍟 Antipasti',   fn: m=>m.reparto==='Cucina'&&m.cat!=='Dolci'},
@@ -1971,7 +1980,6 @@ function addProd() {
   if (!nome) return;
   const catMap={
     pizze:    {reparto:'Pizzeria'},
-    speciali: {reparto:'Pizzeria',cat:'Speciali'},
     fritte:   {reparto:'Pizzeria',cat:'Fritte'},
     panuozzi: {reparto:'Pizzeria',cat:'Panuozzi'},
     cucina:   {reparto:'Cucina'},
@@ -2083,7 +2091,7 @@ function entraTavolo(key){
   const tabsGrp={
     bar:['🍺 Birre','🥤 Bibite','🍷 Vino','☕ Caffetteria','🥃 Liquori','🍹 Aperitivo'],
     cucina:['🍟 Antipasti','🍰 Dolci'],
-    pizza:['🍕 Pizze','👑 Reali','📜 Storiche','👵 Suocere','⭐ Speciali','🥟 Fritte','🥖 Panuozzi']
+    pizza:['🍕 Pizze','👑 Reali','📜 Storiche','👵 Suocere','🥟 Fritte','🥖 Panuozzi']
   };
   const tabs=[].concat(tabsGrp.bar,tabsGrp.cucina,tabsGrp.pizza);
   window._curTab=tabs[0];
@@ -2104,9 +2112,11 @@ function entraTavolo(key){
       const prodId=v.prodottoId||k;
       const p=menu.find(m=>m.id===prodId);
       if(!p) return '';
-      const aggNomi=(v.aggiunte||[]).map(aid=>{const a=(settings.aggiunte||[]).find(x=>x.id===aid);return a?a.nome:'';}).filter(Boolean).join(', ');
+      const aggNomi=variantiLabel(v);
+      const aggE=variantiExtra(v);
       return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">'+
         '<span style="flex:1">'+v.qty+'× '+p.nome+(aggNomi?' <span style=\'color:var(--green);font-size:11px\'>(+'+aggNomi+')</span>':'')+(v.note?' <span style=\'color:var(--muted);font-size:11px\'>'+v.note+'</span>':'')+'</span>'+
+        '<span style="color:var(--muted);flex-shrink:0;">'+eur((p.prezzo+aggE)*v.qty)+'</span>'+
         (p.reparto!=='Bar'?'<button onclick="mostraAggiunte(\''+k+'\',\''+prodId+'\')" style="background:none;border:none;color:var(--gold);font-size:16px;cursor:pointer;padding:2px 4px;">'+(p.reparto==='Pizzeria'?'✏️':'📝')+'</button>':'')+
         '<button onclick="delete cart[\''+k+'\'];window.buildOrdinazione()" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:2px 4px;font-weight:700;">✕</button>'+
         '</div>';
@@ -2118,7 +2128,7 @@ function entraTavolo(key){
         return '<button onclick="apriCategoriaOverlay(\''+key+'\',\''+grp+'\')" style="flex:1;min-width:0;padding:12px 6px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-weight:700;cursor:pointer;">'+gm.icon+' '+gm.label+'</button>';
       }).join('')+
       '</div>';
-    const totCart=Object.entries(cart).reduce((s,[k,v])=>{const prodId=v.prodottoId||k;const p=menu.find(m=>m.id===prodId);return s+(p?(p.prezzo)*v.qty:0);},0);
+    const totCart=Object.entries(cart).reduce((s,[k,v])=>{const prodId=v.prodottoId||k;const p=menu.find(m=>m.id===prodId);if(!p)return s;const aggE=variantiExtra(v);return s+(p.prezzo+aggE)*v.qty;},0);
     ov.innerHTML=
       '<div style="width:100%;max-width:520px;height:100%;display:flex;flex-direction:column;overflow:hidden;">'+
       '<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:8px;flex-shrink:0;">'+
@@ -2153,7 +2163,7 @@ function entraTavolo(key){
 
 // ── PANNELLO CATEGORIA A SCHERMO INTERO (Bar / Cucina / Pizza) ──
 const CATEGORIA_DEF={
-  pizza:{icon:'🍕',label:'PIZZA',reparto:'Pizzeria',cats:[['📋 Tutte','Tutte'],['🍕 Pizze','Classiche'],['👑 Reali','Reali'],['📜 Storiche','Storiche'],['👵 Suocere','Tre Suocere'],['⭐ Speciali','Speciali'],['🥟 Fritte','Fritte'],['🥖 Panuozzi','Panuozzi']]},
+  pizza:{icon:'🍕',label:'PIZZA',reparto:'Pizzeria',cats:[['📋 Tutte','Tutte'],['🍕 Pizze','Classiche'],['👑 Reali','Reali'],['📜 Storiche','Storiche'],['👵 Suocere','Tre Suocere'],['🥟 Fritte','Fritte'],['🥖 Panuozzi','Panuozzi']]},
   bar:{icon:'🍹',label:'BAR',reparto:'Bar',cats:[['🍺 Birre','Birre'],['🥤 Bibite','Bibite'],['🍷 Vino','Vino'],['☕ Caffetteria','Caffetteria'],['🥃 Liquori','Liquori'],['🍹 Aperitivo','Aperitivo']]},
   cucina:{icon:'🍟',label:'CUCINA',reparto:'Cucina',cats:[['🍟 Antipasti','Antipasti'],['🍰 Dolci','Dolci']]}
 };
@@ -2215,23 +2225,24 @@ function renderCategoriaOverlay(mantieniFocus){
       '<div style="font-weight:800;font-size:14px;line-height:1.25;">'+p.nome+'</div>'+
       '</button>';
   }).join('');
-  const totCart=Object.entries(cart).reduce((s,[k,v])=>{const prodId=v.prodottoId||k;const p=menu.find(m=>m.id===prodId);return s+(p?(p.prezzo)*v.qty:0);},0);
+  const totCart=Object.entries(cart).reduce((s,[k,v])=>{const prodId=v.prodottoId||k;const p=menu.find(m=>m.id===prodId);if(!p)return s;const aggE=variantiExtra(v);return s+(p.prezzo+aggE)*v.qty;},0);
   const nCart=Object.values(cart).reduce((s,v)=>s+(v.qty||0),0);
   const riepilogoCarrello=Object.entries(cart).filter(([,v])=>v.qty>0).map(([k,v])=>{
     const prodId=v.prodottoId||k;
     const p=menu.find(m=>m.id===prodId);
     if(!p)return'';
-    const aggTxt=(v.aggiunte&&v.aggiunte.length)?' <span style="color:var(--green);font-size:11px;">+'+v.aggiunte.length+'</span>':'';
+    const aggE=variantiExtra(v);
+    const _vsel=variantiSelezionate(v);const aggTxt=_vsel.length?' <span style="color:var(--green);font-size:11px;">'+_vsel.length+'</span>':'';
     const noteTxt=v.note?' <span style="color:var(--gold);font-size:11px;">📝</span>':'';
     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:8px;margin-bottom:5px;">'+
       '<button onclick="mostraAggiunte(\''+k+'\',\''+prodId+'\')" style="background:none;border:none;color:var(--gold);font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;">✏️</button>'+
       '<span style="flex:1;font-size:13px;font-weight:700;color:var(--text);">'+v.qty+'× '+p.nome.toUpperCase()+aggTxt+noteTxt+'</span>'+
-      '<span style="font-size:13px;color:var(--muted);flex-shrink:0;">'+eur(p.prezzo*v.qty)+'</span>'+
+      '<span style="font-size:13px;color:var(--muted);flex-shrink:0;">'+eur((p.prezzo+aggE)*v.qty)+'</span>'+
       '</div>';
   }).join('');
   ov.innerHTML=
     '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">'+
-    '<button onclick="chiudiCategoriaOverlay()" style="padding:9px 16px;border-radius:8px;background:var(--accent);border:none;color:#111;font-weight:700;cursor:pointer;">⬅ Torna all\'ordine</button>'+
+    '<button onclick="chiudiCategoriaOverlay()" style="padding:12px 20px;border-radius:10px;background:var(--accent);border:2px solid #fff;color:#111;font-weight:800;cursor:pointer;font-size:15px;display:flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(0,0,0,.4);flex-shrink:0;"><span style="font-size:20px;line-height:1;">⬅</span> Torna all\'ordine</button>'+
     '<span style="font-family:var(--font-display);font-size:19px;color:var(--accent);">'+def.icon+' '+def.label+' — T'+num+'</span>'+
     (nCart>0?'<span style="margin-left:auto;font-family:var(--font-display);font-size:17px;color:var(--gold);">'+eur(totCart)+'</span>':'')+
     '</div>'+
@@ -2279,7 +2290,7 @@ function aggProd(id){
     cartKey=id;
   } else {
     const k=id+'_'+Date.now();
-    cart[k]={qty:1,aggiunte:[],note:'',prodottoId:id};
+    cart[k]={qty:1,varianti:{},note:'',prodottoId:id};
     cartKey=k;
   }
   window.buildOrdinazione();
@@ -2293,37 +2304,44 @@ function mostraAggiunte(cartKey,prodId){
   const ov=dentroFullscreen?pizzaOv:document.getElementById('login-overlay');
   const tornaIndietro=()=>{ if(dentroFullscreen&&typeof renderCategoriaOverlay==='function') renderCategoriaOverlay(); else window.buildOrdinazione(); };
   const aggs=settings.aggiunte||[];
-  function aggHtml(){
+  function tileHtml(){
     const c=cart[cartKey];
+    c.varianti=c.varianti||{};
     return aggs.map(a=>{
-      const sel=(c.aggiunte||[]).includes(a.id);
-      return '<button onclick="togAgg(\''+cartKey+'\',\''+a.id+'\')" style="padding:8px 12px;border-radius:8px;border:1px solid '+(sel?'var(--green)':'var(--border)')+';background:'+(sel?'#5AA65522':'var(--surface2)')+';color:'+(sel?'var(--green)':'var(--text)')+';font-size:13px;cursor:pointer;">'+a.nome+' <span style=\'color:var(--muted)\'>+'+eur(a.prezzo)+'</span></button>';
+      const stato=c.varianti[a.id]; // undefined | 'add' | 'remove'
+      const bg = stato==='add' ? 'var(--accent)' : stato==='remove' ? '#C0392B' : '#4a4a4a';
+      const colore = stato ? '#fff' : '#ccc';
+      const segno = stato==='add' ? '+ ' : stato==='remove' ? '− ' : '';
+      return '<button onclick="cicloVariante(\''+cartKey+'\',\''+a.id+'\')" style="padding:14px 8px;border-radius:10px;border:none;background:'+bg+';color:'+colore+';cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;min-height:64px;box-shadow:0 2px 5px rgba(0,0,0,.25);">'+
+        '<div style="font-weight:800;font-size:13px;line-height:1.25;">'+segno+a.nome+'</div>'+
+        '</button>';
     }).join('');
   }
   function render(){
-    const aggs=settings.aggiunte||[];
     const isPizza=p.reparto==='Pizzeria';
     ov.innerHTML=
       '<div style="width:100%;max-width:520px;'+(dentroFullscreen?'margin:auto;padding:20px;':'')+'">'+
       '<div style="font-family:var(--font-display);font-size:22px;color:var(--accent);margin-bottom:4px;">'+p.nome+'</div>'+
-      '<div style="font-size:13px;color:var(--muted);margin-bottom:14px;">'+eur(p.prezzo)+' base</div>'+
+      '<div style="font-size:13px;color:var(--muted);margin-bottom:4px;">'+eur(p.prezzo)+' base</div>'+
       (isPizza&&aggs.length?
-        '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Aggiunte</div>'+
-        '<div id="agg-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">'+aggHtml()+'</div>'
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Tocca un ingrediente: 1° tocco = <span style="color:var(--green)">aggiungi (a pagamento)</span>, 2° tocco = <span style="color:var(--red)">togli (gratis)</span>, 3° tocco = neutro</div>'+
+        '<div id="agg-chips" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-bottom:14px;">'+tileHtml()+'</div>'
         :'')+
       '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Nota</div>'+
-      '<input id="agg-note" placeholder="es. senza cipolla, ben cotto..." value="'+(cart[cartKey].note||'')+'" oninput="cart[\''+cartKey+'\'].note=this.value" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:14px;box-sizing:border-box;">'+
+      '<input id="agg-note" placeholder="es. ben cotto, tagliata a spicchi..." value="'+(cart[cartKey].note||'')+'" oninput="cart[\''+cartKey+'\'].note=this.value" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:14px;box-sizing:border-box;">'+
       '<div style="display:flex;gap:8px;">'+
       '<button onclick="delete cart[\''+cartKey+'\'];tornaDopoAggiunte()" style="flex:1;padding:14px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:14px;cursor:pointer;">Annulla</button>'+
       '<button onclick="tornaDopoAggiunte()" style="flex:2;padding:14px;border-radius:10px;background:var(--accent);border:none;color:#111;font-size:16px;font-weight:700;cursor:pointer;">✓ Conferma'+(dentroFullscreen?' — continua a scegliere':'')+'</button>'+
       '</div></div>';
   }
-  window.togAgg=function(ck,aid){
+  window.cicloVariante=function(ck,aid){
     const c=cart[ck];if(!c) return;
-    c.aggiunte=c.aggiunte||[];
-    const i=c.aggiunte.indexOf(aid);
-    if(i===-1) c.aggiunte.push(aid); else c.aggiunte.splice(i,1);
-    document.getElementById('agg-chips').innerHTML=aggHtml();
+    c.varianti=c.varianti||{};
+    const stato=c.varianti[aid];
+    if(!stato) c.varianti[aid]='add';
+    else if(stato==='add') c.varianti[aid]='remove';
+    else delete c.varianti[aid];
+    const el=document.getElementById('agg-chips'); if(el) el.innerHTML=tileHtml();
   };
   window.tornaDopoAggiunte=tornaIndietro;
   render();
@@ -2360,7 +2378,7 @@ function inviaOrdine(key, aspettaAntipasto){
   const voci=ci.map(([k,v])=>{
     const prodId=v.prodottoId||k;
     const p=menu.find(m=>m.id===prodId);if(!p) return null;
-    const aggSel=(v.aggiunte||[]).map(aid=>{const a=(settings.aggiunte||[]).find(x=>x.id===aid);return a?{id:a.id,nome:a.nome,prezzo:a.prezzo}:null;}).filter(Boolean);
+    const aggSel=variantiSelezionate(v);
     const ext=aggSel.reduce((s,a)=>s+a.prezzo,0);
     const aspetta=aspettaAntipasto&&p.reparto==='Pizzeria';
     return{vid:uid(),prodottoId:prodId,nome:p.nome,prezzo:p.prezzo,prezzoUnitario:p.prezzo+ext,aggiunte:aggSel,reparto:p.reparto,qty:v.qty,note:v.note||'',pronto:false,aspetta:aspetta||false};
