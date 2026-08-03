@@ -484,6 +484,17 @@ let impTab='locale';
 
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
 function eur(n){return Number(n).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+// Converte la mappa varianti {id:'add'|'remove'} dell'articolo nel carrello in un elenco utilizzabile
+function variantiSelezionate(v){
+  const mappa=v.varianti||{};
+  return Object.entries(mappa).map(([aid,stato])=>{
+    const a=(S.aggiunte||[]).find(x=>x.id===aid);
+    if(!a) return null;
+    return {id:a.id,nome:a.nome,prezzo:stato==='add'?a.prezzo:0,tipo:stato==='add'?'aggiunta':'tolto'};
+  }).filter(Boolean);
+}
+function variantiExtra(v){ return variantiSelezionate(v).reduce((s,a)=>s+a.prezzo,0); }
+function variantiLabel(v){ return variantiSelezionate(v).map(a=>a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome).join(', '); }
 function nowT(){return new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
 function todayS(){return new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'})}
 function isPizza(p){return p&&p.reparto==='Pizzeria';}
@@ -620,7 +631,7 @@ function cartExt(key){
   const c=cart[key]; if(!c||!c.qty) return 0;
   const prodId=c.prodottoId||key;
   const p=M.find(m=>m.id===prodId); if(!p) return 0;
-  const ext=(c.aggiunte||[]).reduce((s,aid)=>{const a=(S.aggiunte||[]).find(x=>x.id===aid);return s+(a?a.prezzo:0)},0);
+  const ext=variantiExtra(c);
   return(p.prezzo+ext)*c.qty;
 }
 
@@ -767,6 +778,7 @@ function renderSala(){
 const DISPLAY_TABS = ['🍕 Pizze','⭐ Speciali','🔥 Fritte','🥪 Panuozzi','Cucina','Bar','🍷 Vino','🍮 Dolci'];
 
 function getItemsForTab(tab){
+  if(tab==='📋 Tutte')        return M.filter(m=>m.reparto==='Pizzeria');
   if(tab==='🍕 Pizze')        return M.filter(m=>m.reparto==='Pizzeria'&&!m.cat);
   if(tab==='👑 Reali')        return M.filter(m=>m.cat==='Reali');
   if(tab==='📜 Storiche')     return M.filter(m=>m.cat==='Storiche');
@@ -799,7 +811,7 @@ function renderMenuLeft(){
 }
 function setMLT(r){menuTab=r;renderLeft();}
 function addCart(id){
-  const c=cart[id]||{qty:0,note:'',aggiunte:[]};
+  const c=cart[id]||{qty:0,note:'',varianti:{}};
   c.qty++;cart[id]=c;
   if(selT) renderRight(); else renderLeft();
 }
@@ -820,6 +832,7 @@ const POS_CATS=[
   {id:'caffe',     nome:'CAFFETTERIA',icon:'☕', bg:'#5D4037', grp:'bar'},
   {id:'liquori',   nome:'LIQUORI',    icon:'🥃', bg:'#4A148C', grp:'bar'},
   {id:'aperitivo', nome:'APERITIVO',  icon:'🍹', bg:'#E65100', grp:'bar'},
+  {id:'tutte',     nome:'TUTTE',      icon:'📋', bg:'#E8541C', grp:'pizza'},
   {id:'pizze',     nome:'PIZZE CLASSICHE',icon:'🍕', bg:'#E8541C', grp:'pizza'},
   {id:'suocere',   nome:'TRE SUOCERE',icon:'👵', bg:'#AD1457', grp:'pizza'},
   {id:'reali',     nome:'PIZZE REALI',icon:'👑', bg:'#F9A825', grp:'pizza'},
@@ -872,9 +885,9 @@ function renderPosOrderList(){
   const cartItems=Object.entries(cart).filter(([,v])=>v.qty>0).map(([key,v])=>{
     const prodId=v.prodottoId||key;
     const p=M.find(m=>m.id===prodId); if(!p) return null;
-    const ext=(v.aggiunte||[]).reduce((s,aid)=>{const a=(S.aggiunte||[]).find(x=>x.id===aid);return s+(a?a.prezzo:0)},0);
+    const ext=variantiExtra(v);
     const prezzoFin=v.prezzoOverride!=null?v.prezzoOverride:p.prezzo+ext;
-    return{vid:'cart-'+key,nome:p.nome,prezzo:prezzoFin,prezzoUnitario:prezzoFin,qty:v.qty,inCart:true,aggiunte:v.aggiunte||[],note:v.note||''};
+    return{vid:'cart-'+key,nome:p.nome,prezzo:prezzoFin,prezzoUnitario:prezzoFin,qty:v.qty,inCart:true,aggiunte:variantiSelezionate(v),note:v.note||''};
   }).filter(Boolean);
 
   const all=[...voci.map(v=>({...v,inCart:false})),...cartItems];
@@ -896,13 +909,13 @@ function renderPosOrderList(){
     all.forEach(v=>{
       const imp=(v.prezzoUnitario||v.prezzo)*v.qty;
       const sel=posSelectedRow===v.vid;
-      const agg=(v.aggiunte||[]).map(a=>{if(typeof a==='string'){const x=(S.aggiunte||[]).find(s=>s.id===a);return x?x.nome:a;}return a.nome||a;}).filter(Boolean).join(', ');
+      const agg=(v.aggiunte||[]).map(a=>{if(typeof a==='string'){const x=(S.aggiunte||[]).find(s=>s.id===a);return x?x.nome:a;}return a?(a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome):'';}).filter(Boolean).join(', ');
       html+=`<div class="pos-row ${sel?'sel':''}">
         <span class="pqty" style="${v.inCart?'color:var(--grn)':''}">
           ${v.qty}
         </span>
         <span class="pname" onclick="selPosRow('${v.vid}')" style="cursor:pointer">
-          <div>${v.nome}${agg?` <span style="font-size:10px;color:var(--grn)">+${agg}</span>`:''}${v.aspetta?` <span style="font-size:10px;color:var(--gold);font-weight:700">⏳ in attesa</span>`:''}</div>
+          <div>${v.nome}${agg?` <span style="font-size:10px;color:var(--grn)">${agg}</span>`:''}${v.aspetta?` <span style="font-size:10px;color:var(--gold);font-weight:700">⏳ in attesa</span>`:''}</div>
           ${v.note?`<div style="font-size:10px;color:var(--mut)">${v.note}</div>`:''}
         </span>
         <span class="pprc">${(v.prezzoUnitario||v.prezzo).toFixed(2)}</span>
@@ -1001,7 +1014,8 @@ async function apriCassetto(){
 }
 
 function catTabLabel(catId){
-  return catId==='pizze'?'🍕 Pizze':
+  return catId==='tutte'?'📋 Tutte':
+    catId==='pizze'?'🍕 Pizze':
     catId==='reali'?'👑 Reali':
     catId==='storiche'?'📜 Storiche':
     catId==='suocere'?'👵 Suocere':
@@ -1046,7 +1060,7 @@ function setPosGrp(grp){
 }
 function setPosCat(catId){
   window._posCatAttivo=catId;
-  renderPosItemsArea();
+  renderPosCategories();
 }
 function renderPosItemsArea(){
   const catId=window._posCatAttivo;
@@ -1071,13 +1085,13 @@ function addPosItem(id){
   const p=M.find(m=>m.id===id); if(!p) return;
   if(p.reparto==='Bar'){
     // bevande: incrementa quantità (nessuna aggiunta)
-    const c=cart[id]||{qty:0,note:'',aggiunte:[],prodottoId:id};
+    const c=cart[id]||{qty:0,note:'',varianti:{},prodottoId:id};
     c.qty++;
     cart[id]=c;
   } else {
     // pizze/cucina: ogni click = riga separata con chiave unica
     const k=id+'_'+Date.now();
-    cart[k]={qty:1,note:'',aggiunte:[],prodottoId:id};
+    cart[k]={qty:1,note:'',varianti:{},prodottoId:id};
   }
   renderPosOrderList();
   renderPosItemsArea();
@@ -1092,8 +1106,9 @@ function modificaPosItem(cartKey){
 function showPosAggiunte(prodId, cartKey){
   const p=M.find(m=>m.id===prodId); if(!p) return;
   const k=cartKey||prodId;
-  if(!cart[k]) cart[k]={qty:1,note:'',aggiunte:[],prodottoId:prodId};
+  if(!cart[k]) cart[k]={qty:1,note:'',varianti:{},prodottoId:prodId};
   const c=cart[k];
+  c.varianti=c.varianti||{};
 
   document.getElementById('pay-box').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -1102,22 +1117,9 @@ function showPosAggiunte(prodId, cartKey){
         <div style="font-size:12px;color:var(--mut)">${eur(p.prezzo)} base</div>
       </div>
     </div>
-    <div style="font-size:11px;color:var(--mut);margin-bottom:5px">Aggiunte</div>
-    <input id="pos-agg-search" oninput="filtraPosAgg(this.value)" placeholder="🔍 Cerca ingrediente..."
-      style="width:100%;background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:6px 10px;color:var(--txt);font-size:12px;font-family:var(--fb);margin-bottom:8px">
-    <div id="pos-agg-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
-      ${(S.aggiunte||[]).map(a=>{
-        const on=(c.aggiunte||[]).includes(a.id);
-        return `<span onclick="togPosAgg('${k}','${a.id}')" id="pac-${a.id}" style="
-          padding:5px 10px;border-radius:7px;cursor:pointer;font-size:12px;
-          border:1px solid ${on?'var(--grn)':'var(--bord)'};
-          background:${on?'#5AA65522':'var(--surf)'};
-          color:${on?'var(--grn)':'var(--txt)'};
-          transition:all .1s;">${a.nome} <span style="color:var(--mut)">+${eur(a.prezzo)}</span>
-        </span>`;
-      }).join('')}
-    </div>
-    <input id="pos-agg-note" placeholder="Note (es. senza cipolla)"
+    <div style="font-size:11px;color:var(--mut);margin-bottom:8px">Tocca un ingrediente: 1° tocco = aggiungi (a pagamento), 2° = togli (gratis), 3° = neutro</div>
+    <div id="pos-agg-chips" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px;margin-bottom:12px;">${posAggTilesHtml(k)}</div>
+    <input id="pos-agg-note" placeholder="Note (es. ben cotto)"
       style="width:100%;background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:7px 10px;color:var(--txt);font-size:13px;font-family:var(--fb);margin-bottom:12px"
       value="${c.note||''}" oninput="cart['${k}']={...cart['${k}'],note:this.value}">
     <div class="btn-g">
@@ -1126,35 +1128,34 @@ function showPosAggiunte(prodId, cartKey){
     </div>`;
   document.getElementById('pay-ov').style.display='flex';
 }
+function posAggTilesHtml(k){
+  const c=cart[k]; if(!c) return '';
+  c.varianti=c.varianti||{};
+  return (S.aggiunte||[]).map(a=>{
+    const stato=c.varianti[a.id];
+    const bg = stato==='add' ? 'var(--acc)' : stato==='remove' ? '#C0392B' : 'var(--surf)';
+    const bordo = stato ? 'none' : '1px solid var(--bord)';
+    const colore = stato ? '#fff' : 'var(--txt)';
+    const segno = stato==='add' ? '+ ' : stato==='remove' ? 'SENZA ' : '';
+    return `<button onclick="cicloPosAgg('${k}','${a.id}')" style="padding:10px 6px;border-radius:8px;border:${bordo};background:${bg};color:${colore};cursor:pointer;text-align:center;font-size:12px;font-weight:700;min-height:44px;">${segno}${a.nome}</button>`;
+  }).join('');
+}
+function cicloPosAgg(k,aid){
+  const c=cart[k]; if(!c) return;
+  c.varianti=c.varianti||{};
+  const stato=c.varianti[aid];
+  if(!stato) c.varianti[aid]='add';
+  else if(stato==='add') c.varianti[aid]='remove';
+  else delete c.varianti[aid];
+  const grid=document.getElementById('pos-agg-chips');
+  if(grid) grid.innerHTML=posAggTilesHtml(k);
+}
 
 function chPosQty(k, d){
   const c=cart[k]; if(!c) return;
   c.qty=Math.max(1,c.qty+d);
   const el=document.getElementById('pos-agg-qty');
   if(el) el.textContent=c.qty;
-}
-
-function togPosAgg(cartKey, aggId){
-  const c=cart[cartKey]; if(!c) return;
-  c.aggiunte=c.aggiunte||[];
-  const i=c.aggiunte.indexOf(aggId);
-  const sel=i===-1;
-  if(sel)c.aggiunte.push(aggId);else c.aggiunte.splice(i,1);
-  const chip=document.getElementById('pac-'+aggId);
-  if(chip){
-    chip.style.borderColor=sel?'var(--grn)':'var(--bord)';
-    chip.style.background=sel?'#5AA65522':'var(--surf)';
-    chip.style.color=sel?'var(--grn)':'var(--txt)';
-  }
-}
-
-function filtraPosAgg(q){
-  const chips=document.getElementById('pos-agg-chips');
-  if(!chips)return;
-  const s=q.toLowerCase().trim();
-  chips.querySelectorAll('span').forEach(c=>{
-    c.style.display=(!s||c.textContent.toLowerCase().includes(s))?'':'none';
-  });
 }
 
 function confermaPosAgg(id){
@@ -1240,7 +1241,7 @@ function printComandaCassa(voci, tavKey){
         <div style="border-top:1px dashed #000;margin:6px 0"></div>
         ${voceRep.map(v=>`
           <div style="font-size:20px;font-weight:700;margin-bottom:2px">${v.qty}× ${v.nome}</div>
-          ${(v.aggiunte||[]).length?`<div style="font-size:13px;padding-left:12px">${v.aggiunte.map(a=>(a.tipo==='tolto'?'−':'+')+a.nome).join(', ')}</div>`:''}
+          ${(v.aggiunte||[]).length?`<div style="font-size:13px;padding-left:12px">${v.aggiunte.map(a=>a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome).join(', ')}</div>`:''}
           ${v.note?`<div style="font-size:13px;font-style:italic;padding-left:12px">↳ ${v.note}</div>`:''}
           ${v.aspetta?`<div style="font-size:14px;font-weight:700">⏳ PRIMA UN ANTIPASTO</div>`:''}
         `).join('<div style="border-top:1px dotted #ccc;margin:4px 0"></div>')}
@@ -1298,8 +1299,8 @@ function renderRight(){
     t.giri.forEach(g=>{
       b+=`<div style="font-size:10px;color:var(--mut);margin-bottom:2px">${g.orario}</div>`;
       g.voci.forEach(v=>{
-        const agg=(v.aggiunte||[]).map(a=>{if(typeof a==='string'){const x=(S.aggiunte||[]).find(s=>s.id===a);return x?x.nome:a;}return a.nome||a;}).filter(Boolean).join(', ');
-        b+=`<div class="row">${v.qty}× ${v.nome}${agg?` <span style="color:var(--grn);font-size:10px">+${agg}</span>`:''}${v.note?` <span style="color:var(--mut);font-size:10px">(${v.note})</span>`:''}<span>${eur((v.prezzoUnitario||v.prezzo)*v.qty)}</span></div>`;
+        const agg=(v.aggiunte||[]).map(a=>{if(typeof a==='string'){const x=(S.aggiunte||[]).find(s=>s.id===a);return x?x.nome:a;}return a?(a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome):'';}).filter(Boolean).join(', ');
+        b+=`<div class="row">${v.qty}× ${v.nome}${agg?` <span style="color:var(--grn);font-size:10px">${agg}</span>`:''}${v.note?` <span style="color:var(--mut);font-size:10px">(${v.note})</span>`:''}<span>${eur((v.prezzoUnitario||v.prezzo)*v.qty)}</span></div>`;
       });
     });
     if((t.coperti||0)>0) b+=`<div class="row mu">Coperti ×${t.coperti}<span>${eur(tCop(t))}</span></div>`;
@@ -1326,7 +1327,7 @@ function renderRight(){
 
   if(menuTab){
     getItemsForTab(menuTab).forEach(p=>{
-    const c=cart[p.id]||{qty:0,note:'',aggiunte:[]};
+    const c=cart[p.id]||{qty:0,note:'',varianti:{}};
     b+=`<div style="margin-bottom:5px">
       <div class="prow">
         <div style="flex:1"><div class="pname">${p.nome}</div><div class="pprice">${eur(p.prezzo)}</div></div>
@@ -1337,9 +1338,8 @@ function renderRight(){
         </div>
       </div>
       ${c.qty>0?`
-        ${isPizza(p)?`<div class="aggbox"><div class="agglbl">Aggiunte</div>
-          <input id="aggcs-${p.id}" oninput="filtraAggC('${p.id}',this.value)" placeholder="🔍 Cerca ingrediente..." style="width:100%;background:var(--surf);border:1px solid var(--bord);border-radius:6px;padding:4px 8px;color:var(--txt);font-size:11px;font-family:var(--fb);margin-bottom:5px;">
-          <div id="aggc-${p.id}" class="aggchips">${(S.aggiunte||[]).map(a=>{const on=(c.aggiunte||[]).includes(a.id);const tolto=a.tipo==='tolto';return`<span class="chip ${on?'on':''}" style="${tolto?'border-color:var(--red)':''}" onclick="togAgg('${p.id}','${a.id}')">${tolto?'−':'+'} ${a.nome}${tolto?'':' +'+eur(a.prezzo)}</span>`}).join('')}</div>
+        ${isPizza(p)?`<div class="aggbox"><div class="agglbl">Ingredienti (tocca: aggiungi → togli → neutro)</div>
+          <div id="aggc-${p.id}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px;">${aggTilesHtml(p.id)}</div>
         </div>`:''}
         <input class="fi" style="margin-top:3px" placeholder="Note…" value="${c.note||''}" oninput="setNote('${p.id}',this.value)">
       `:''}
@@ -1504,7 +1504,7 @@ function plApply(){
 }
 
 function chC(id,d){
-  const c=cart[id]||{qty:0,note:'',aggiunte:[]};
+  const c=cart[id]||{qty:0,note:'',varianti:{}};
   c.qty=Math.max(0,c.qty+d);
   if(c.qty===0)delete cart[id];else cart[id]=c;
   renderRight();
@@ -1525,19 +1525,27 @@ function filtraAggC2(prodId,q){
   el.querySelectorAll('span').forEach(c=>{c.style.display=(!s||c.textContent.toLowerCase().includes(s))?'':'none';});
 }
 
-function togAgg(pid,aid){
+function aggTilesHtml(pid){
+  const c=cart[pid]; if(!c) return '';
+  c.varianti=c.varianti||{};
+  return (S.aggiunte||[]).map(a=>{
+    const stato=c.varianti[a.id]; // undefined | 'add' | 'remove'
+    const bg = stato==='add' ? 'var(--acc)' : stato==='remove' ? '#C0392B' : '#3a3a3a';
+    const colore = stato ? '#fff' : '#ccc';
+    const segno = stato==='add' ? '+ ' : stato==='remove' ? 'SENZA ' : '';
+    return `<button onclick="cicloVariante('${pid}','${a.id}')" style="padding:10px 6px;border-radius:8px;border:none;background:${bg};color:${colore};cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;min-height:44px;font-size:11px;font-weight:700;line-height:1.2;">${segno}${a.nome}</button>`;
+  }).join('');
+}
+function cicloVariante(pid,aid){
   const c=cart[pid];if(!c)return;
-  c.aggiunte=c.aggiunte||[];
-  const i=c.aggiunte.indexOf(aid);
-  const sel=i===-1;
-  if(sel)c.aggiunte.push(aid);else c.aggiunte.splice(i,1);
-  // aggiorna solo il chip — nessun re-render
-  const list=document.getElementById('aggc-'+pid);
-  if(list) list.querySelectorAll('span').forEach(s=>{
-    if(s.getAttribute('onclick')?.includes("'"+aid+"'")){
-      s.className='chip'+(sel?' on':'');
-    }
-  });
+  c.varianti=c.varianti||{};
+  const stato=c.varianti[aid];
+  if(!stato) c.varianti[aid]='add';
+  else if(stato==='add') c.varianti[aid]='remove';
+  else delete c.varianti[aid];
+  // aggiorna solo la griglia — nessun re-render completo
+  const grid=document.getElementById('aggc-'+pid);
+  if(grid) grid.innerHTML=aggTilesHtml(pid);
   // aggiorna solo il footer
   const ci=Object.entries(cart).filter(([,v])=>v.qty>0);
   const ct=ci.reduce((s,[id])=>s+cartExt(id),0);
@@ -1603,7 +1611,7 @@ function inviaC(aspettaAntipasto){
   const voci=ci.map(([,v])=>{
     const prodId=v.prodottoId||'';
     const p=M.find(m=>m.id===prodId);if(!p)return null;
-    const aggSel=(v.aggiunte||[]).map(aid=>{const a=(S.aggiunte||[]).find(x=>x.id===aid);return a?{id:a.id,nome:a.nome,prezzo:a.prezzo,tipo:a.tipo||'aggiunta'}:null}).filter(Boolean);
+    const aggSel=variantiSelezionate(v);
     const ext=aggSel.reduce((s,a)=>s+a.prezzo,0);
     const aspetta=aspettaAntipasto&&p.reparto==='Pizzeria';
     const prezzoFin=v.prezzoOverride!=null?v.prezzoOverride:p.prezzo+ext;
@@ -1801,7 +1809,7 @@ function stampaConto(key){
     let righe='';
     voci.forEach(v=>{
       const imp=(v.prezzoUnitario||v.prezzo)*v.qty;
-      righe+=row(v.qty,v.nome+(v.aggiunte?.length?' (+'+v.aggiunte.map(a=>(a.tipo==='tolto'?'−':'+')+a.nome).join(', ')+')':'')+(v.note?' *'+v.note:''),imp);
+      righe+=row(v.qty,v.nome+(v.aggiunte?.length?' ('+v.aggiunte.map(a=>a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome).join(', ')+')':'')+(v.note?' *'+v.note:''),imp);
     });
     if((t.coperti||0)>0) righe+=row(t.coperti,'Coperto',totCop);
     const html=`<div style="text-align:center;margin-bottom:4px"><img src="data:image/png;base64,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" style="width:220px;height:auto"></div>
@@ -1994,11 +2002,11 @@ function renderAspLeft(){
   } else {
     all.forEach(v=>{
       const imp=(v.prezzoUnitario||v.prezzo)*v.qty;
-      const agg=(v.aggiunte||[]).map(a=>{if(typeof a==='string'){const x=(S.aggiunte||[]).find(s=>s.id===a);return x?x.nome:a;}return a.nome||a;}).filter(Boolean).join(', ');
+      const agg=(v.aggiunte||[]).map(a=>{if(typeof a==='string'){const x=(S.aggiunte||[]).find(s=>s.id===a);return x?x.nome:a;}return a?(a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome):'';}).filter(Boolean).join(', ');
       h+=`<div class="pos-row">
         <span class="pqty" style="${v.inCart?'color:var(--grn)':''}">${v.qty}</span>
         <span class="pname" ${v.inCart?`onclick="showAspAggiunte('${v.vid.replace('cart-','')}')" style="cursor:pointer"`:''}>
-          <div>${v.nome}${agg?` <span style="font-size:10px;color:var(--grn)">+${agg}</span>`:''}</div>
+          <div>${v.nome}${agg?` <span style="font-size:10px;color:var(--grn)">${agg}</span>`:''}</div>
           ${v.note?`<div style="font-size:10px;color:var(--mut)">${v.note}</div>`:''}
         </span>
         <span class="pprc">${(v.prezzoUnitario||v.prezzo).toFixed(2)}</span>
@@ -2060,7 +2068,7 @@ function setAspGrp(grp){
 }
 function setAspCat(catId){
   aspRightCat=catId;
-  renderAspItemsArea();
+  renderAspRight();
 }
 function renderAspItemsArea(){
   const catId=aspRightCat;
@@ -2169,7 +2177,7 @@ function inviaAspCucina(id){
   // 1) sposta le voci dal carrello provvisorio nell'ordine (come i tavoli: selezione → invio, un solo passaggio)
   Object.entries(aspCart).filter(([,v])=>v.qty>0).forEach(([pid,v])=>{
     const p=M.find(m=>m.id===pid);if(!p)return;
-    const aggSel=(v.aggiunte||[]).map(aid=>{const a=(S.aggiunte||[]).find(x=>x.id===aid);return a?{id:a.id,nome:a.nome,prezzo:a.prezzo,tipo:a.tipo||'aggiunta'}:null}).filter(Boolean);
+    const aggSel=variantiSelezionate(v);
     const ext=aggSel.reduce((s,a)=>s+a.prezzo,0);
     ord.voci.push({vid:uid(),prodottoId:pid,nome:p.nome,prezzo:p.prezzo,prezzoUnitario:p.prezzo+ext,aggiunte:aggSel,reparto:p.reparto,qty:v.qty,note:v.note||''});
   });
@@ -2212,7 +2220,7 @@ function aggAspVoci(){
   if(!ord.voci) ord.voci=[];
   Object.entries(aspCart).filter(([,v])=>v.qty>0).forEach(([id,v])=>{
     const p=M.find(m=>m.id===id);if(!p)return;
-    const aggSel=(v.aggiunte||[]).map(aid=>{const a=(S.aggiunte||[]).find(x=>x.id===aid);return a?{id:a.id,nome:a.nome,prezzo:a.prezzo,tipo:a.tipo||'aggiunta'}:null}).filter(Boolean);
+    const aggSel=variantiSelezionate(v);
     const ext=aggSel.reduce((s,a)=>s+a.prezzo,0);
     ord.voci.push({vid:uid(),prodottoId:id,nome:p.nome,prezzo:p.prezzo,prezzoUnitario:p.prezzo+ext,aggiunte:aggSel,reparto:p.reparto,qty:v.qty,note:v.note||''});
   });
@@ -2290,7 +2298,7 @@ function preparaRicevutaAsp(ord, pag, mancia){
     let righe='';
     voci.forEach(v=>{
       const imp=(v.prezzoUnitario||v.prezzo)*v.qty;
-      righe+=fmtRow(v.qty,v.nome+(v.aggiunte?.length?' '+v.aggiunte.map(a=>(a.tipo==='tolto'?'−':'+')+a.nome).join(','):'')+(v.note?' ('+v.note+')':''),imp);
+      righe+=fmtRow(v.qty,v.nome+(v.aggiunte?.length?' '+v.aggiunte.map(a=>a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome).join(','):'')+(v.note?' ('+v.note+')':''),imp);
     });
     const html=`<div style="text-align:center;font-weight:900;font-size:20px">TEPERINO</div>
       <div style="text-align:center;font-size:11px;font-style:italic;font-weight:600">PIZZA VERACE NAPOLETANA</div>
@@ -2344,7 +2352,7 @@ function preparaRicevuta(key, pag, mancia){
     let righe='';
     voci.forEach(v=>{
       const imp=(v.prezzoUnitario||v.prezzo)*v.qty;
-      righe+=fmtRow(v.qty,v.nome+(v.aggiunte?.length?' '+v.aggiunte.map(a=>(a.tipo==='tolto'?'−':'+')+a.nome).join(','):'')+(v.note?' ('+v.note+')':''),imp);
+      righe+=fmtRow(v.qty,v.nome+(v.aggiunte?.length?' '+v.aggiunte.map(a=>a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome).join(','):'')+(v.note?' ('+v.note+')':''),imp);
     });
     if((t.coperti||0)>0) righe+=fmtRow(t.coperti,'Coperto',totCop);
     const html=`<div style="text-align:center;font-weight:900;font-size:20px">TEPERINO</div>
@@ -2449,7 +2457,7 @@ function stampaAsp(id){
     <div style="border-top:1px dashed #000;margin:6px 0"></div>
     ${(o.voci||[]).map(v=>`
       <div style="font-size:18px;font-weight:700;margin-bottom:2px">${v.qty}× ${v.nome}</div>
-      ${(v.aggiunte||[]).length?`<div style="font-size:12px;padding-left:12px">${v.aggiunte.map(a=>(a.tipo==='tolto'?'−':'+')+a.nome).join(', ')}</div>`:''}
+      ${(v.aggiunte||[]).length?`<div style="font-size:12px;padding-left:12px">${v.aggiunte.map(a=>a.tipo==='tolto'?'SENZA '+a.nome:'+'+a.nome).join(', ')}</div>`:''}
       ${v.note?`<div style="font-size:12px;font-style:italic;padding-left:12px">↳ ${v.note}</div>`:''}
     `).join('<div style="border-top:1px dotted #ccc;margin:3px 0"></div>')}
     <div style="border-top:2px solid #000;margin-top:8px;padding-top:6px;display:flex;justify-content:space-between;font-size:16px;font-weight:700">
@@ -2833,6 +2841,7 @@ function renderImp(){
       <div id="imp-msg" style="margin-top:6px"></div>`;
   } else if(impTab==='menu'){
     const cats=[
+      {id:'tutte',    nome:'📋 Tutte',    fn: m=>m.reparto==='Pizzeria'},
       {id:'pizze',    nome:'🍕 Pizze',    fn: m=>m.reparto==='Pizzeria'&&!m.cat},
       {id:'reali',    nome:'👑 Reali',    fn: m=>m.cat==='Reali'},
       {id:'storiche', nome:'📜 Storiche', fn: m=>m.cat==='Storiche'},
@@ -2886,22 +2895,18 @@ function renderImp(){
       <div id="menu-msg" style="margin-top:4px"></div>`;
     el.innerHTML=h;
   } else if(impTab==='aggiunte') {
-    let h='';
+    let h=`<div style="font-size:10px;color:var(--mut);margin-bottom:10px;line-height:1.4">Ogni ingrediente qui sotto potrà essere aggiunto (a pagamento) o tolto (gratis) direttamente al momento dell'ordine, senza doverlo impostare qui.</div>`;
     (S.aggiunte||[]).forEach((a,i)=>{
-      const tolto=a.tipo==='tolto';
       h+=`<div id="agg-row-${i}" style="display:flex;gap:5px;margin-bottom:5px;align-items:center;background:var(--bg);border:1px solid var(--bord);border-radius:8px;padding:6px 8px;">
-        <span style="flex-shrink:0;width:18px;text-align:center;font-weight:800;color:${tolto?'var(--red)':'var(--grn)'}">${tolto?'−':'+'}</span>
         <div style="flex:1;display:flex;gap:5px;">
           <input id="an-${i}" class="fi" style="flex:2;font-size:12px;padding:5px 8px" value="${a.nome.replace(/"/g,'&quot;')}">
-          <input id="ap-${i}" class="fi" type="number" step="0.5" style="flex:1;font-size:12px;padding:5px 8px;${tolto?'opacity:.4':''}" value="${tolto?0:a.prezzo}" ${tolto?'disabled':''}>
+          <input id="ap-${i}" class="fi" type="number" step="0.5" style="flex:1;font-size:12px;padding:5px 8px" value="${a.prezzo}">
         </div>
-        <button onclick="toggleTipoAgg(${i})" title="Cambia tra aggiunta a pagamento e rimozione gratis" style="width:36px;height:32px;border-radius:6px;border:1px solid var(--bord);background:var(--bg);color:var(--txt);cursor:pointer;font-size:13px;flex-shrink:0">⇄</button>
         <button onclick="salvaAgg(${i})" style="width:36px;height:32px;border-radius:6px;border:1px solid var(--grn);background:var(--grn);color:#111;cursor:pointer;font-size:16px;flex-shrink:0">✓</button>
         <button onclick="delAgg(${i})" style="width:36px;height:32px;border-radius:6px;border:1px solid var(--red);background:none;color:var(--red);cursor:pointer;font-size:14px;flex-shrink:0">✕</button>
       </div>`;
     });
-    h+=`<div style="font-size:10px;color:var(--mut);margin:8px 0 10px;line-height:1.4">➕ verde = si aggiunge e si paga (es. + gorgonzola) — ➖ rosso = si toglie, gratis (es. − olive). Tocca ⇄ per cambiare tipo.</div>
-    <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin:10px 0 5px">Aggiungi variante</div>
+    h+=`<div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin:10px 0 5px">Aggiungi ingrediente</div>
     <div style="display:flex;gap:5px;margin-bottom:9px">
       <input class="fi" style="flex:2;font-size:12px;padding:5px 8px" id="na-n" placeholder="Nome (es. Speck o Olive)">
       <input class="fi" style="flex:1;font-size:12px;padding:5px 8px" type="number" step="0.5" id="na-p" placeholder="€">
@@ -3074,22 +3079,14 @@ function addP(){
 function saveMen(){LS.set('m',M);const m=document.getElementById('menu-msg');if(m){m.innerHTML='<span style="color:var(--grn);font-size:12px">✓ Salvato</span>';setTimeout(()=>{if(m)m.innerHTML=''},2000);}}
 function salvaAgg(i){
   const nome=document.getElementById('an-'+i)?.value?.trim();
-  const tolto=S.aggiunte[i]?.tipo==='tolto';
-  const prezzo=tolto?0:(parseFloat(document.getElementById('ap-'+i)?.value)||0);
+  const prezzo=parseFloat(document.getElementById('ap-'+i)?.value)||0;
   if(!nome) return;
   if(S.aggiunte[i]){S.aggiunte[i].nome=nome;S.aggiunte[i].prezzo=prezzo;LS.set('s',S);}
   const row=document.getElementById('agg-row-'+i);
   if(row){row.style.borderColor='var(--grn)';setTimeout(()=>{row.style.borderColor='var(--bord)'},1500);}
 }
-function toggleTipoAgg(i){
-  const a=S.aggiunte[i];if(!a)return;
-  a.tipo=(a.tipo==='tolto')?'aggiunta':'tolto';
-  if(a.tipo==='tolto') a.prezzo=0;
-  LS.set('s',S);
-  renderImp();
-}
 function delAgg(i){S.aggiunte.splice(i,1);renderImp();}
-function addAgg(){const n=(document.getElementById('na-n').value||'').trim(),p=parseFloat(document.getElementById('na-p').value)||0;if(!n)return;if(!S.aggiunte)S.aggiunte=[];S.aggiunte.push({id:'ag'+uid(),nome:n,prezzo:p,tipo:'aggiunta'});renderImp();}
+function addAgg(){const n=(document.getElementById('na-n').value||'').trim(),p=parseFloat(document.getElementById('na-p').value)||0;if(!n)return;if(!S.aggiunte)S.aggiunte=[];S.aggiunte.push({id:'ag'+uid(),nome:n,prezzo:p});renderImp();}
 function saveAgg(){LS.set('s',S);const m=document.getElementById('agg-msg');if(m){m.innerHTML='<span style="color:var(--grn);font-size:12px">✓ Salvato</span>';setTimeout(()=>{if(m)m.innerHTML=''},2000);}}
 
 // ── INIT ──
